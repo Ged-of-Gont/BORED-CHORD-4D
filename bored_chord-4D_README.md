@@ -67,7 +67,6 @@ the foundation of musical tuning systems from all around the world. Below are 4 
                                                                                                                              
                                                                                                                                                                                                                                                                                                                        
                                                                                                                                                      
-
                                                                                                                                                          
 So it stands to reason that since any chord (i.e. simultaneous sounding of multiple tones) can be expressed with ratios just like two notes can,
 more dimensions could be added to the Bowditch curve beyond X & Y. A triad could be represented as a 3D curve, and as I soon realized, it doesn't
@@ -79,8 +78,7 @@ Below is a 1954 painting of the Crucifiction by Dalí titled Corpus Hypercubus. 
 into 3 dimnesions which looks like some kind of 3D cubist cross. He called this blend of the scientific and the sacred, "Nuclear Mysticism."
 
 
-                                                                                                                                                       
-                                                                                                                                                   
+                                                                                                                                                                                                                                                                                                   
                                                                                                                                                    
                                                                                 @                                                                  
                                                                          @@@@%%%@                                                                  
@@ -149,5 +147,5 @@ into 3 dimnesions which looks like some kind of 3D cubist cross. He called this 
                                                                                                                                                    
                                                                                                                                                    
                                                                                                                                                    
-                                                                                                                             
+                                                                                                                            
 

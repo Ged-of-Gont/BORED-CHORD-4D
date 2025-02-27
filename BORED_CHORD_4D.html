@@ -9,6 +9,10 @@
 <html>
 <head>
   <meta charset="UTF-8" />
+
+  <!-- 1) MOBILE VIEWPORT META TAG -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>BORED CHORD 4D</title>
   <link href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
@@ -36,7 +40,7 @@
     body {
       background: var(--background);
       margin: 0;
-      overflow: hidden;
+      overflow: hidden; /* Typically okay, but you might prefer auto for mobile. */
       color: var(--primary-accent);
       font-family: 'Martian Mono', monospace;
       font-weight: 200;
@@ -57,21 +61,23 @@
     }
 
     /*========================================================
-      3) TOOLBAR PANELS
+      3) TOOLBAR PANELS (RESPONSIVE)
     ========================================================*/
+    /* On larger screens, we keep them side by side with a max-width. */
     #controlsLeft,
     #controlsRight {
-      width: 400px;
+      max-width: 400px;
+      width: 100%;
       padding: 15px;
       background: rgba(20, 18, 20, 0.5);
     }
     #controlsLeft {
-      position: fixed;
+      position: absolute;
       top: 10px;
       left: 10px;
     }
     #controlsRight {
-      position: fixed;
+      position: absolute;
       top: 10px;
       right: 10px;
     }
@@ -84,6 +90,19 @@
       margin-bottom: 0;
       padding-bottom: 0;
       border-bottom: none;
+    }
+
+    /* MEDIA QUERY: When screen width is below 900px, stack them vertically. */
+    @media (max-width: 900px) {
+      #controlsLeft,
+      #controlsRight {
+        position: static;    /* no absolute positioning on narrow screens */
+        margin: 10px auto;   /* center them horizontally if you like */
+      }
+      /* One below the other, full width */
+      body {
+        overflow: auto; /* allow scrolling on small screens if needed */
+      }
     }
 
     /*========================================================
@@ -128,15 +147,11 @@
       padding: 0.25em;
       text-align: center;
     }
-
-    /* Add a green highlight on focus */
     #controlsLeft input[type="number"]:focus {
       outline: none;
       box-shadow: 0 0 0 3px var(--secondary-accent);
       border-color: var(--secondary-accent);
     }
-
-    /* Remove spin buttons in some browsers */
     #controlsLeft input[type="number"]::-webkit-inner-spin-button,
     #controlsLeft input[type="number"]::-webkit-outer-spin-button {
       -webkit-appearance: none;
@@ -251,8 +266,8 @@
     ========================================================*/
     .saveLoadBtn {
       display: inline-block;
-      background: var(--secondary); /* Red */
-      color: var(--primary);        /* Off-white */
+      background: var(--secondary);
+      color: var(--primary);
       font-family: 'Martian Mono', monospace;
       font-weight: 500;
       font-size: 1em;
@@ -267,8 +282,8 @@
       justify-content: space-between;
     }
     .saveLoadBtn:hover {
-      background: var(--secondary-accent); /* e.g. spring green highlight */
-      color: var(--background);            /* black-ish text or your choice */
+      background: var(--secondary-accent);
+      color: var(--background);
     }
 
     /*========================================================
@@ -298,7 +313,6 @@
     #myCanvas {
       display: block;
     }
-
   </style>
 </head>
 <body>
@@ -561,6 +575,11 @@
 
   <canvas id="myCanvas"></canvas>
 
+  <!--
+      NOTE: We removed the old "scaleToolbar" approach 
+      to rely on the fluid + media query layout above.
+  -->
+
   <script>
     /********************************************************
      * WAVE TOGGLES
@@ -648,7 +667,6 @@
         let eff = (val + obj.offset) % (2 * Math.PI);
         label.textContent = radToDeg(eff).toFixed(0);
       });
-      // Trigger an initial update
       slider.dispatchEvent(new Event('input'));
     });
 
@@ -754,8 +772,6 @@
       r = rotateZ(r.x, r.y, r.z, az);
       return r;
     }
-
-    // 4D rotation "helpers"
     function rotateXY(v, t) {
       let c = Math.cos(t), s = Math.sin(t);
       return { x: v.x * c - v.y * s, y: v.x * s + v.y * c, z: v.z, w: v.w };
@@ -977,8 +993,7 @@
       let ax = getContinuousAngle("rotXRange");
       let ay = getContinuousAngle("rotYRange");
       let rawAz = getContinuousAngle("rotZRange");
-      // your old offset:
-      let az = rawAz + Math.PI / 2;
+      let az = rawAz + Math.PI / 2; // old offset
 
       let vol = getTaperedValue("volumeSlider") || 5;
       let camZ = 5 - 0.4 * (vol - 1);
@@ -1029,7 +1044,6 @@
         let y3 = v4.y * factor4;
         let z3 = v4.z * factor4;
 
-        // mismatch param => rotateXYZ(..., ay, ax, az)
         let { x: xr, y: yr, z: zr } = rotateXYZ(x3, y3, z3, ay, ax, az);
 
         let denom = camZ - zr;
@@ -1115,30 +1129,7 @@
     });
   </script>
 
-  <script>
-    /********************************************************
-     * RESPONSIVE SCALING OF TOOLBARS
-     ********************************************************/
-    function scaleToolbar(toolbar) {
-      const viewportHeight = window.innerHeight;
-      const toolbarHeight = toolbar.scrollHeight;
-      const scale = Math.min(1, viewportHeight / toolbarHeight);
-      toolbar.style.transform = `scale(${scale})`;
-      if (toolbar.id === "controlsRight") {
-        toolbar.style.transformOrigin = "top right";
-      } else {
-        toolbar.style.transformOrigin = "top left";
-      }
-    }
-    const controlsLeft = document.getElementById("controlsLeft");
-    const controlsRight = document.getElementById("controlsRight");
-    scaleToolbar(controlsLeft);
-    scaleToolbar(controlsRight);
-    window.addEventListener("resize", () => {
-      scaleToolbar(controlsLeft);
-      scaleToolbar(controlsRight);
-    });
-  </script>
+  <!-- We removed your scaleToolbar approach in favor of fluid layout + media queries. -->
 
   <script>
     /********************************************************
