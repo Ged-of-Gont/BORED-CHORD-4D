@@ -336,6 +336,36 @@
       return customTaper(t, cfg);
     }
   </script>
+<!-- ===============================
+    POLAR/CARTESIAN BUTTON
+     =============================== -->
+     <button id="coordSwitchBtn" data-mode="cartesian" style="
+     position: fixed;
+     bottom: 10px;
+     left: 50%;
+     transform: translateX(-50%);
+     width: 180px;
+     height: 40px;
+     font-size: 1em;
+     font-family: 'Martian Mono', monospace;
+     font-weight: 500;
+     cursor: pointer;
+     background: var(--secondary);
+     color: var(--primary);
+     border: none;
+   ">
+     CARTESIAN
+   </button>
+   
+   <style>
+     /* OPTIONAL: when toggled to polar, invert style. */
+     #coordSwitchBtn[data-mode="polar"] {
+       background: var(--background) !important;
+       color: var(--secondary) !important;
+       border: 3px solid var(--secondary) !important;
+     }
+   </style>
+   
 
   <!-- LEFT TOOLBAR -->
   <div id="controlsLeft">
@@ -938,134 +968,191 @@
       }
       ctx.restore();
     }
-
-    /********************************************************
-     * MAIN ANIMATION LOOP
-     ********************************************************/
-    let lastFrameTime = performance.now();
-    function drawFrame(now) {
-      let deltaTime = (now - lastFrameTime) * 0.001;
-      lastFrameTime = now;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // LFO freq
-      const lfo1 = masterRateToggle1.checked, lfo2 = masterRateToggle2.checked;
-      let f1 = getTaperedValue("masterRateSlider");
-      let f2 = getTaperedValue("masterRateSlider2");
-      let effFreq;
-      if (lfo1 && !lfo2)      effFreq = f1;
-      else if (!lfo1 && lfo2) effFreq = f2;
-      else if (lfo1 && lfo2) {
-        effFreq = f1 * (1 + 0.5 * Math.sin(2 * Math.PI * f2 * (now * 0.001)));
-      } else effFreq = 0;
-
-      const speed = 2 * Math.PI * effFreq;
-      updateAutomatedSliders(deltaTime, speed);
-
-      let fx = parseFloat(freqXInput.value) || 3;
-      let fy = parseFloat(freqYInput.value) || 4;
-      let fz = parseFloat(freqZInput.value) || 5;
-      let fw = parseFloat(freqWInput.value) || 6;
-
-      // read 4D phases
-      let phx = getContinuousAngle("phaseXRange");
-      let phy = getContinuousAngle("phaseYRange");
-      let phz = getContinuousAngle("phaseZRange");
-      let phw = getContinuousAngle("phaseWRange");
-
-      // read 3D angles
-      let ax = getContinuousAngle("rotXRange");
-      let ay = getContinuousAngle("rotYRange");
-      let rawAz = getContinuousAngle("rotZRange");
-      // your old offset:
-      let az = rawAz + Math.PI / 2;
-
-      let vol = getTaperedValue("volumeSlider") || 5;
-      let camZ = 5 - 0.4 * (vol - 1);
-
-      let n = timeArray.length;
-
-      let waveX = document.getElementById("waveTypeX").dataset.wave;
-      let waveY = document.getElementById("waveTypeY").dataset.wave;
-      let waveZ = document.getElementById("waveTypeZ").dataset.wave;
-      let waveW = document.getElementById("waveTypeW").dataset.wave;
-
-      // read 4D angles
-      let aXY = getContinuousAngle("angle4DXYRange");
-      let aXZ = getContinuousAngle("angle4DXZRange");
-      let aXW = getContinuousAngle("angle4DXWRange");
-      let aYZ = getContinuousAngle("angle4DYZRange");
-      let aYW = getContinuousAngle("angle4DYWRange");
-      let aZW = getContinuousAngle("angle4DZWRange");
-
-      let alphaFrac = getTaperedValue("saturationSlider") / 100;
-
-      // MAIN wave draw
-      for (let i = 0; i < n; i++) {
-        let t = timeArray[i];
-        let angleX = 2 * Math.PI * fx * t + phx;
-        let angleY = 2 * Math.PI * fy * t + phy;
-        let angleZ = 2 * Math.PI * fz * t + phz;
-        let angleW = 2 * Math.PI * fw * t + phw;
-
-        let x4 = getWaveValue(waveX, angleX);
-        let y4 = getWaveValue(waveY, angleY);
-        let z4 = getWaveValue(waveZ, angleZ);
-        let w4 = getWaveValue(waveW, angleW);
-
-        let v4 = { x: x4, y: y4, z: z4, w: w4 };
-        v4 = rotateXY(v4, aXY);
-        v4 = rotateXZ(v4, aXZ);
-        v4 = rotateXW(v4, aXW);
-        v4 = rotateYZ(v4, aYZ);
-        v4 = rotateYW(v4, aYW);
-        v4 = rotateZW(v4, aZW);
-
-        let allZero4D = (aXW === 0 && aYW === 0 && aZW === 0);
-        let effW = allZero4D ? 0 : v4.w;
-        let d4 = 5;
-        let factor4 = d4 / (d4 - effW);
-        let x3 = v4.x * factor4;
-        let y3 = v4.y * factor4;
-        let z3 = v4.z * factor4;
-
-        // mismatch param => rotateXYZ(..., ay, ax, az)
-        let { x: xr, y: yr, z: zr } = rotateXYZ(x3, y3, z3, ay, ax, az);
-
-        let denom = camZ - zr;
-        if (Math.abs(denom) < 1e-5) continue;
-        let scale = Math.min(canvas.width, canvas.height) * 0.45;
-        let px = canvas.width * 0.5 + (xr / denom) * scale;
-        let py = canvas.height * 0.5 - (yr / denom) * scale;
-
-        // constant radius
-        let radius = 2;
-        let whiteAlpha = 1 - alphaFrac;
-        let hue = (zr + 1) * 180;
-
-        // partial off-white fill
-        if (whiteAlpha > 0) {
-          ctx.fillStyle = `rgba(251,246,228,${whiteAlpha})`;
-          ctx.beginPath();
-          ctx.arc(px, py, radius, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-        // hue-based fill
-        ctx.fillStyle = `hsla(${hue},100%,50%,${alphaFrac})`;
+</script>
+<script>
+  /********************************************************
+   * MAIN ANIMATION LOOP (UPDATED)
+   ********************************************************/
+  
+  // 1) A global for coordinate mode:
+  let coordMode = 'cartesian'; // default
+  
+  // 2) Hook up the toggle button
+  const coordSwitchBtn = document.getElementById('coordSwitchBtn');
+  coordSwitchBtn.addEventListener('click', () => {
+    if (coordMode === 'cartesian') {
+      coordMode = 'polar';
+      coordSwitchBtn.dataset.mode = 'polar';
+      coordSwitchBtn.textContent = 'POLAR';
+    } else {
+      coordMode = 'cartesian';
+      coordSwitchBtn.dataset.mode = 'cartesian';
+      coordSwitchBtn.textContent = 'CARTESIAN';
+    }
+  });
+  
+  // 3) A helper for wave values in [-1,1]
+  function waveVal(waveType, angle) {
+    if (waveType === 'off') return 0;
+    if (waveType === 'triangle') {
+      return (2/Math.PI)*Math.asin(Math.sin(angle));
+    }
+    // default => sine
+    return Math.sin(angle);
+  }
+  
+  // 4) Our animation timing
+  let lastFrameTime = performance.now();
+  function drawFrame(now) {
+    let deltaTime = (now - lastFrameTime)*0.001;
+    lastFrameTime = now;
+  
+    // Clear canvas each frame
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+    // (A) EXAMPLE LFO FREQUENCY => speed (YOU can customize this logic)
+    // For instance, read the two LFO sliders:
+    let f1 = getTaperedValue("masterRateSlider");
+    let f2 = getTaperedValue("masterRateSlider2");
+    // Suppose we pick speed = 2π * f1. Or combine them if you like:
+    let speed = 2 * Math.PI * f1;
+    // Then update the "auto" phase sliders:
+    updateAutomatedSliders(deltaTime, speed);
+  
+    // (B) Gather freqX,Y,Z,W + wave toggles
+    let fx = parseFloat(freqXInput.value) || 3;
+    let fy = parseFloat(freqYInput.value) || 4;
+    let fz = parseFloat(freqZInput.value) || 5;
+    let fw = parseFloat(freqWInput.value) || 6;
+  
+    let waveXType = waveTypeX.dataset.wave;
+    let waveYType = waveTypeY.dataset.wave;
+    let waveZType = waveTypeZ.dataset.wave;
+    let waveWType = waveTypeW.dataset.wave;
+  
+    // (C) Gather phase sliders
+    let phx = getContinuousAngle("phaseXRange");
+    let phy = getContinuousAngle("phaseYRange");
+    let phz = getContinuousAngle("phaseZRange");
+    let phw = getContinuousAngle("phaseWRange");
+  
+    // (D) 3D + 4D rotation angles
+    let ax = getContinuousAngle("rotXRange");
+    let ay = getContinuousAngle("rotYRange");
+    let rawAz = getContinuousAngle("rotZRange");
+    let az = rawAz + Math.PI/2;  // your existing offset
+  
+    let aXY = getContinuousAngle("angle4DXYRange");
+    let aXZ = getContinuousAngle("angle4DXZRange");
+    let aXW = getContinuousAngle("angle4DXWRange");
+    let aYZ = getContinuousAngle("angle4DYZRange");
+    let aYW = getContinuousAngle("angle4DYWRange");
+    let aZW = getContinuousAngle("angle4DZWRange");
+  
+    // (E) Volume => camera Z position, etc.
+    let vol = getTaperedValue("volumeSlider") || 5;
+    let camZ = 5 - 0.4*(vol - 1);
+  
+    // (F) Color saturation
+    let alphaFrac = getTaperedValue("saturationSlider")/100;
+  
+    // (G) Iterate over all timeArray points
+    let n = timeArray.length;
+    for (let i = 0; i < n; i++) {
+      let t = timeArray[i];
+      let angleX = 2*Math.PI*fx*t + phx;
+      let angleY = 2*Math.PI*fy*t + phy;
+      let angleZ = 2*Math.PI*fz*t + phz;
+      let angleW = 2*Math.PI*fw*t + phw;
+  
+      // Choose wave coords in either cartesian or polar
+      let x4, y4, z4, w4;
+      if (coordMode === 'cartesian') {
+        // Old approach
+        x4 = waveVal(waveXType, angleX);
+        y4 = waveVal(waveYType, angleY);
+        z4 = waveVal(waveZType, angleZ);
+        w4 = waveVal(waveWType, angleW);
+      } else {
+        // 4D spherical approach
+        let valX = waveVal(waveXType, angleX); // in [-1,1]
+        let valY = waveVal(waveYType, angleY);
+        let valZ = waveVal(waveZType, angleZ);
+        let valW = waveVal(waveWType, angleW);
+  
+        // Map to angles/radius
+        // alpha1 in [0..2π], alpha2 in [0..π], alpha3 in [0..π], r in [0..2]
+        let alpha1 = (valX + 1)*Math.PI;      // [0..2π]
+        let alpha2 = (valY + 1)*0.5*Math.PI;  // [0..π]
+        let alpha3 = (valZ + 1)*0.5*Math.PI;  // [0..π]
+        let r      = (valW + 1);             // [0..2]
+  
+        x4 = r * Math.cos(alpha1);
+        y4 = r * Math.sin(alpha1)*Math.cos(alpha2);
+        z4 = r * Math.sin(alpha1)*Math.sin(alpha2)*Math.cos(alpha3);
+        w4 = r * Math.sin(alpha1)*Math.sin(alpha2)*Math.sin(alpha3);
+      }
+  
+      // (H) Apply 4D rotation
+      let v4 = { x:x4, y:y4, z:z4, w:w4 };
+      v4 = rotateXY(v4, aXY);
+      v4 = rotateXZ(v4, aXZ);
+      v4 = rotateXW(v4, aXW);
+      v4 = rotateYZ(v4, aYZ);
+      v4 = rotateYW(v4, aYW);
+      v4 = rotateZW(v4, aZW);
+  
+      // (I) Project 4D->3D
+      let d4 = 5;
+      let factor4 = d4/(d4 - v4.w);
+      let x3 = v4.x * factor4;
+      let y3 = v4.y * factor4;
+      let z3 = v4.z * factor4;
+  
+      // Then 3D rotate
+      let r3 = rotateXYZ(x3, y3, z3, ay, ax, az);
+      let xr = r3.x, yr = r3.y, zr = r3.z;
+  
+      // (J) Camera 3D->2D
+      let denom = camZ - zr;
+      if (Math.abs(denom)<1e-5) continue;
+      let scale = Math.min(canvas.width, canvas.height)*0.45;
+      let px = canvas.width*0.5 + (xr/denom)*scale;
+      let py = canvas.height*0.5 - (yr/denom)*scale;
+  
+      // (K) Draw wave point
+      let radius = 2;
+      let whiteAlpha = 1 - alphaFrac;
+      let hue = (zr+1)*180;
+  
+      if (whiteAlpha>0) {
+        ctx.fillStyle = `rgba(251,246,228,${whiteAlpha})`;
         ctx.beginPath();
-        ctx.arc(px, py, radius, 0, 2 * Math.PI);
+        ctx.arc(px, py, radius, 0, 2*Math.PI);
         ctx.fill();
       }
-
-      // If wireframe ON
-      if (wireframeBtn.dataset.wireframe === 'on') {
-        drawWireframe(ax, ay, az, aXY, aXZ, aXW, aYZ, aYW, aZW, camZ);
-      }
-
-      requestAnimationFrame(drawFrame);
+      ctx.fillStyle = `hsla(${hue},100%,50%,${alphaFrac})`;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, 2*Math.PI);
+      ctx.fill();
     }
+  
+    // (L) If wireframe is ON, draw either hypercube or 4D-sphere
+    if (wireframeBtn.dataset.wireframe === 'on') {
+      if (coordMode === 'cartesian') {
+        drawWireframe(ax, ay, az, aXY, aXZ, aXW, aYZ, aYW, aZW, camZ);
+      } else {
+        drawWireframePolar(ax, ay, az, aXY, aXZ, aXW, aYZ, aYW, aZW, camZ);
+      }
+    }
+  
+    // Repeat animation
     requestAnimationFrame(drawFrame);
+  }
+  // Kickstart the loop
+  requestAnimationFrame(drawFrame);
   </script>
+
 
   <!-- Slider gradient fill -->
   <script>
@@ -1306,6 +1393,222 @@
     document.getElementById("initializeSettings").addEventListener("click", () => {
       setSettings(defaultSettings);
     });
+
+
+/********************************************************
+ * 4D- & 3D-SPHERE DATA (POLAR MODE)
+ ********************************************************/
+let sphere4DVertices = [];
+let sphere4DEdges = [];
+let sphere3DVertices = [];
+let sphere3DEdges = [];
+
+// Create a 4D "3-sphere" wireframe at radius=1
+// by sampling alpha1 in [0..2π], alpha2 in [0..π], alpha3 in [0..π].
+function generate4DSphereGrid(stepDeg = 90) {
+  sphere4DVertices = [];
+  sphere4DEdges = [];
+
+  const step = (Math.PI/180) * stepDeg;
+  let alpha1Count = Math.floor((2*Math.PI)/step) + 1;
+  let alpha2Count = Math.floor((Math.PI)/step) + 1;
+  let alpha3Count = Math.floor((Math.PI)/step) + 1;
+
+  // Helper to map (i,j,k) -> index in the array
+  function idx(i,j,k) {
+    return i*(alpha2Count*alpha3Count) + j*alpha3Count + k;
+  }
+
+  // Generate the vertices
+  for (let i=0; i<alpha1Count; i++){
+    let a1 = i*step;
+    if (a1>2*Math.PI) a1 = 2*Math.PI; // clamp last step
+
+    for (let j=0; j<alpha2Count; j++){
+      let a2 = j*step;
+      if (a2>Math.PI) a2 = Math.PI;
+
+      for (let k=0; k<alpha3Count; k++){
+        let a3 = k*step;
+        if (a3>Math.PI) a3 = Math.PI;
+
+        // 4D spherical => x,y,z,w
+        // radius=1
+        let x = Math.cos(a1);
+        let y = Math.sin(a1) * Math.cos(a2);
+        let z = Math.sin(a1) * Math.sin(a2) * Math.cos(a3);
+        let w = Math.sin(a1) * Math.sin(a2) * Math.sin(a3);
+
+        sphere4DVertices.push({x, y, z, w});
+      }
+    }
+  }
+
+  // Generate edges by connecting neighbors in each dimension
+  for (let i=0; i<alpha1Count; i++){
+    for (let j=0; j<alpha2Count; j++){
+      for (let k=0; k<alpha3Count; k++){
+        let base = idx(i,j,k);
+        // connect i->i+1
+        if (i+1<alpha1Count) sphere4DEdges.push([ base, idx(i+1,j,k) ]);
+        // connect j->j+1
+        if (j+1<alpha2Count) sphere4DEdges.push([ base, idx(i,j+1,k) ]);
+        // connect k->k+1
+        if (k+1<alpha3Count) sphere4DEdges.push([ base, idx(i,j,k+1) ]);
+      }
+    }
+  }
+}
+
+// Create a 3D sphere wireframe at radius=1
+// by sampling theta in [0..2π], phi in [0..π].
+function generate3DSphereGrid(stepDeg = 90) {
+  sphere3DVertices = [];
+  sphere3DEdges = [];
+
+  const step = (Math.PI/180)*stepDeg;
+  let thetaCount = Math.floor((2*Math.PI)/step) + 1; // [0..2π]
+  let phiCount   = Math.floor((Math.PI)/step) + 1;   // [0..π]
+
+  function idx(i,j) {
+    return i*phiCount + j;
+  }
+
+  for (let i=0; i<thetaCount; i++){
+    let theta = i*step;
+    if (theta>2*Math.PI) theta=2*Math.PI;
+
+    for (let j=0; j<phiCount; j++){
+      let phi = j*step;
+      if (phi>Math.PI) phi=Math.PI;
+
+      let x = Math.sin(phi)*Math.cos(theta);
+      let y = Math.sin(phi)*Math.sin(theta);
+      let z = Math.cos(phi);
+      let w = 0;
+      sphere3DVertices.push({x, y, z, w});
+    }
+  }
+
+  for (let i=0; i<thetaCount; i++){
+    for (let j=0; j<phiCount; j++){
+      let base = idx(i,j);
+      // connect i->i+1
+      if (i+1<thetaCount) sphere3DEdges.push([base, idx(i+1,j)]);
+      // connect j->j+1
+      if (j+1<phiCount)   sphere3DEdges.push([base, idx(i,j+1)]);
+    }
+  }
+}
+
+// Call them once on startup with 90° steps
+generate4DSphereGrid(90);
+generate3DSphereGrid(90);
+
+</script>
+<!-- ===============================
+     CHUNK #3: DRAWING POLAR WIREFRAME
+     =============================== -->
+<script>
+function drawWireframePolar(ax, ay, az, aXY, aXZ, aXW, aYZ, aYW, aZW, camZ) {
+  // 1) Draw 4D-sphere with dotted lines
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]);  // dashed lines
+  ctx.strokeStyle = "rgba(251,246,228,0.5)";
+
+  // Project each sphere4D vertex
+  let proj4D = sphere4DVertices.map((v) => {
+    // rotate in 4D
+    let r = rotateXY(v, aXY);
+    r = rotateXZ(r, aXZ);
+    r = rotateXW(r, aXW);
+    r = rotateYZ(r, aYZ);
+    r = rotateYW(r, aYW);
+    r = rotateZW(r, aZW);
+
+    // 4D->3D perspective
+    let d4 = 5;
+    let factor4 = d4 / (d4 - r.w);
+    let x3 = r.x * factor4;
+    let y3 = r.y * factor4;
+    let z3 = r.z * factor4;
+
+    // then 3D rotation
+    let rotated3 = rotateXYZ(x3, y3, z3, ay, ax, az);
+    let xr = rotated3.x;
+    let yr = rotated3.y;
+    let zr = rotated3.z;
+
+    // camera projection
+    let denom = camZ - zr;
+    if (Math.abs(denom) < 1e-5) denom = 1e-5;
+    let scale = Math.min(canvas.width, canvas.height)*0.45;
+    let px = canvas.width*0.5 + (xr/denom)*scale;
+    let py = canvas.height*0.5 - (yr/denom)*scale;
+    return {x: px, y: py};
+  });
+
+  // draw edges
+  for (let [start, end] of sphere4DEdges) {
+    let A = proj4D[start], B = proj4D[end];
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(B.x, B.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 2) Draw 3D-sphere with solid lines
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.strokeStyle = "rgba(251,246,228,0.5)";
+
+  let proj3D = sphere3DVertices.map((v) => {
+    // rotate in 4D (though w=0, so only angles matter)
+    let r = rotateXY(v, aXY);
+    r = rotateXZ(r, aXZ);
+    r = rotateXW(r, aXW);
+    r = rotateYZ(r, aYZ);
+    r = rotateYW(r, aYW);
+    r = rotateZW(r, aZW);
+
+    // 4D->3D
+    let d4 = 5;
+    let factor4 = d4 / (d4 - r.w);
+    let x3 = r.x * factor4;
+    let y3 = r.y * factor4;
+    let z3 = r.z * factor4;
+
+    // 3D rotation
+    let rotated3 = rotateXYZ(x3, y3, z3, ay, ax, az);
+    let xr = rotated3.x;
+    let yr = rotated3.y;
+    let zr = rotated3.z;
+
+    // camera
+    let denom = camZ - zr;
+    if (Math.abs(denom) < 1e-5) denom = 1e-5;
+    let scale = Math.min(canvas.width, canvas.height)*0.45;
+    let px = canvas.width*0.5 + (xr/denom)*scale;
+    let py = canvas.height*0.5 - (yr/denom)*scale;
+    return { x:px, y:py };
+  });
+
+  for (let [start, end] of sphere3DEdges) {
+    let A = proj3D[start], B = proj3D[end];
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(B.x, B.y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+</script>
+
+
   </script>
 </body>
 </html>
