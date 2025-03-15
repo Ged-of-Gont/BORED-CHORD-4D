@@ -1056,86 +1056,91 @@
     // (F) Color saturation
     let alphaFrac = getTaperedValue("saturationSlider")/100;
   
-    // (G) Iterate over all timeArray points
-    let n = timeArray.length;
-    for (let i = 0; i < n; i++) {
-      let t = timeArray[i];
-      let angleX = 2*Math.PI*fx*t + phx;
-      let angleY = 2*Math.PI*fy*t + phy;
-      let angleZ = 2*Math.PI*fz*t + phz;
-      let angleW = 2*Math.PI*fw*t + phw;
-  
-      // Choose wave coords in either cartesian or polar
-      let x4, y4, z4, w4;
-      if (coordMode === 'cartesian') {
-        // Old approach
-        x4 = waveVal(waveXType, angleX);
-        y4 = waveVal(waveYType, angleY);
-        z4 = waveVal(waveZType, angleZ);
-        w4 = waveVal(waveWType, angleW);
-      } else {
-        // 4D spherical approach
-        let valX = waveVal(waveXType, angleX); // in [-1,1]
-        let valY = waveVal(waveYType, angleY);
-        let valZ = waveVal(waveZType, angleZ);
-        let valW = waveVal(waveWType, angleW);
-  
-        // Map to angles/radius
-        // alpha1 in [0..2π], alpha2 in [0..π], alpha3 in [0..π], r in [0..2]
-        let alpha1 = (valX + 1)*Math.PI;      // [0..2π]
-        let alpha2 = (valY + 1)*0.5*Math.PI;  // [0..π]
-        let alpha3 = (valZ + 1)*0.5*Math.PI;  // [0..π]
-        let r      = (valW + 1);             // [0..2]
-  
-        x4 = r * Math.cos(alpha1);
-        y4 = r * Math.sin(alpha1)*Math.cos(alpha2);
-        z4 = r * Math.sin(alpha1)*Math.sin(alpha2)*Math.cos(alpha3);
-        w4 = r * Math.sin(alpha1)*Math.sin(alpha2)*Math.sin(alpha3);
-      }
-  
-      // (H) Apply 4D rotation
-      let v4 = { x:x4, y:y4, z:z4, w:w4 };
-      v4 = rotateXY(v4, aXY);
-      v4 = rotateXZ(v4, aXZ);
-      v4 = rotateXW(v4, aXW);
-      v4 = rotateYZ(v4, aYZ);
-      v4 = rotateYW(v4, aYW);
-      v4 = rotateZW(v4, aZW);
-  
-      // (I) Project 4D->3D
-      let d4 = 5;
-      let factor4 = d4/(d4 - v4.w);
-      let x3 = v4.x * factor4;
-      let y3 = v4.y * factor4;
-      let z3 = v4.z * factor4;
-  
-      // Then 3D rotate
-      let r3 = rotateXYZ(x3, y3, z3, ay, ax, az);
-      let xr = r3.x, yr = r3.y, zr = r3.z;
-  
-      // (J) Camera 3D->2D
-      let denom = camZ - zr;
-      if (Math.abs(denom)<1e-5) continue;
-      let scale = Math.min(canvas.width, canvas.height)*0.45;
-      let px = canvas.width*0.5 + (xr/denom)*scale;
-      let py = canvas.height*0.5 - (yr/denom)*scale;
-  
-      // (K) Draw wave point
-      let radius = 2;
-      let whiteAlpha = 1 - alphaFrac;
-      let hue = (zr+1)*180;
-  
-      if (whiteAlpha>0) {
-        ctx.fillStyle = `rgba(251,246,228,${whiteAlpha})`;
-        ctx.beginPath();
-        ctx.arc(px, py, radius, 0, 2*Math.PI);
-        ctx.fill();
-      }
-      ctx.fillStyle = `hsla(${hue},100%,50%,${alphaFrac})`;
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0, 2*Math.PI);
-      ctx.fill();
-    }
+/********************************************************
+ * (G) Iterate over all timeArray points (Option B: 2D polar)
+ ********************************************************/
+ let n = timeArray.length;
+for (let i = 0; i < n; i++) {
+  let t = timeArray[i];
+
+  // 1) Compute angles for each wave
+  let angleX = 2 * Math.PI * fx * t + phx;
+  let angleY = 2 * Math.PI * fy * t + phy;
+  let angleZ = 2 * Math.PI * fz * t + phz;
+  let angleW = 2 * Math.PI * fw * t + phw;
+
+  // 2) Get wave values in [-1..1]
+  let valX = waveVal(waveXType, angleX);
+  let valY = waveVal(waveYType, angleY);
+  let valZ = waveVal(waveZType, angleZ);
+  let valW = waveVal(waveWType, angleW);
+
+  // 3) Choose wave coords in either Cartesian or 2D polar (XY + ZW)
+  let x4, y4, z4, w4;
+  if (coordMode === 'cartesian') {
+    // Same as your existing Cartesian logic:
+    x4 = valX;
+    y4 = valY;
+    z4 = valZ;
+    w4 = valW;
+  } else {
+    // Option B: 2D polar in (x,y) + 2D polar in (z,w)
+    // Each radius is [0..2], each angle is [0..2π].
+    let r1 = 1 + valX;                 // radius for XY plane
+    let t1 = Math.PI * (valY + 1);     // angle for XY plane
+    x4 = r1 * Math.cos(t1);
+    y4 = r1 * Math.sin(t1);
+
+    let r2 = 1 + valZ;                 // radius for ZW plane
+    let t2 = Math.PI * (valW + 1);     // angle for ZW plane
+    z4 = r2 * Math.cos(t2);
+    w4 = r2 * Math.sin(t2);
+  }
+
+  // (H) Apply 4D rotations
+  let v4 = { x: x4, y: y4, z: z4, w: w4 };
+  v4 = rotateXY(v4, aXY);
+  v4 = rotateXZ(v4, aXZ);
+  v4 = rotateXW(v4, aXW);
+  v4 = rotateYZ(v4, aYZ);
+  v4 = rotateYW(v4, aYW);
+  v4 = rotateZW(v4, aZW);
+
+  // (I) 4D -> 3D perspective
+  let d4 = 5;
+  let factor4 = d4 / (d4 - v4.w);
+  let x3 = v4.x * factor4;
+  let y3 = v4.y * factor4;
+  let z3 = v4.z * factor4;
+
+  // 3D rotation
+  let r3 = rotateXYZ(x3, y3, z3, ay, ax, az);
+  let xr = r3.x, yr = r3.y, zr = r3.z;
+
+  // (J) Camera 3D -> 2D
+  let denom = camZ - zr;
+  if (Math.abs(denom) < 1e-5) continue;
+  let scale = Math.min(canvas.width, canvas.height) * 0.45;
+  let px = canvas.width * 0.5 + (xr / denom) * scale;
+  let py = canvas.height * 0.5 - (yr / denom) * scale;
+
+  // (K) Draw wave point (same color logic as before)
+  let radius = 2;
+  let whiteAlpha = 1 - alphaFrac;
+  let hue = (zr + 1) * 180;
+
+  if (whiteAlpha > 0) {
+    ctx.fillStyle = `rgba(251,246,228,${whiteAlpha})`;
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  ctx.fillStyle = `hsla(${hue}, 100%, 50%, ${alphaFrac})`;
+  ctx.beginPath();
+  ctx.arc(px, py, radius, 0, 2 * Math.PI);
+  ctx.fill();
+}
+
   
     // (L) If wireframe is ON, draw either hypercube or 4D-sphere
     if (wireframeBtn.dataset.wireframe === 'on') {
